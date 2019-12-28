@@ -1,4 +1,4 @@
-package com.example.locamap2;
+package com.example.locamap;
 
 import android.location.Location;
 import android.location.LocationListener;

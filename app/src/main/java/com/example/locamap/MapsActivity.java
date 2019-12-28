@@ -1,4 +1,4 @@
-package com.example.locamap2;
+package com.example.locamap;
 
 import android.Manifest;
 import android.app.PendingIntent;
@@ -14,12 +14,12 @@ import android.os.StrictMode;
 import android.util.Log;
 
 import androidx.annotation.RequiresApi;
-import androidx.fragment.app.FragmentActivity;
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.GroundOverlay;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
@@ -36,13 +36,14 @@ import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.TimeZone;
 
 import static android.util.Log.d;
 
-public class MapsActivity extends FragmentActivity implements
-        OnMapReadyCallback{
+public class MapsActivity extends AppCompatActivity implements
+        OnMapReadyCallback {
 
     private GoogleMap mMap;
     private MarkerOptions mapMarkOptionsGPS = null;
@@ -50,6 +51,14 @@ public class MapsActivity extends FragmentActivity implements
     private Boolean iMapShowed = false;
     public Boolean iGPSFix = false;
     private SatelliteListener mGnssListener;
+
+    private ArrayList<Intent> malIntents = null;
+    private ArrayList<PendingIntent> malPendingIntents = null;
+    private ArrayList<IntentFilter> malIntentFilters = null;
+    private ArrayList<myProximityAlert> malProximitys = null;
+
+    private GroundOverlay mGroundOverlayQuakes;
+    private GroundOverlay mGroundOverlayDevice;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,6 +80,7 @@ public class MapsActivity extends FragmentActivity implements
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+
     }
 
 
@@ -89,6 +99,46 @@ public class MapsActivity extends FragmentActivity implements
 
         this.fillGoogleMap(mMap);
         iMapShowed = true;
+    }
+
+    public void deleteArrayObjects()
+    {
+/*
+                    private ArrayList<Intent> malIntents;
+                    private ArrayList<PendingIntent> malPendingIntents;
+                    private ArrayList<IntentFilter> malIntentFilters;
+                    private ArrayList<myProximityAlert> malProximitys;
+*/
+
+        if (malIntents        == null) malIntents = new ArrayList<Intent>();
+        if (malPendingIntents == null) malPendingIntents = new ArrayList<PendingIntent>();
+        if (malIntentFilters  == null) malIntentFilters = new ArrayList<IntentFilter>();
+        if (malProximitys     == null) malProximitys = new ArrayList<myProximityAlert>();
+
+
+        if (malIntents        != null)
+        {
+            for (Intent i : malIntents) { i = null; }
+            malIntents.clear();
+        }
+
+        if (malPendingIntents != null)
+        {
+            for (PendingIntent i : malPendingIntents) { i = null; }
+            malPendingIntents.clear();
+        }
+
+        if (malIntentFilters  != null)
+        {
+            for (IntentFilter i : malIntentFilters) { i = null; }
+            malIntentFilters.clear();
+        }
+
+        if (malProximitys     != null)
+        {
+            for (myProximityAlert i : malProximitys) { i = null; }
+            malProximitys.clear();
+        }
     }
 
     public JSONObject dl_quake_json() {
@@ -126,6 +176,8 @@ public class MapsActivity extends FragmentActivity implements
         DateFormat dateFormatter = new SimpleDateFormat("dd-MM-yyyy'T'HH:mm:ss.SSSXXX");
         dateFormatter.setTimeZone(TimeZone.getTimeZone("UTC"));
 
+        deleteArrayObjects();
+
         try {
             featuresArr = quakejsonobj.getJSONArray("features");
             LocationManager locman = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
@@ -135,6 +187,14 @@ public class MapsActivity extends FragmentActivity implements
                             checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) &&
                             (locman != null));
 
+            mMap.setMyLocationEnabled(true);
+
+/*            if ( PermissionsAndLocmanOK ) {
+                requestPermission(this, LOCATION_PERMISSION_REQUEST_CODE,
+                        Manifest.permission.ACCESS_FINE_LOCATION, false);
+            }
+
+ */
             for (int i = 0; i < featuresArr.length(); i++) {
 
                 JSONObject featureObj = featuresArr.getJSONObject(i);
@@ -149,11 +209,22 @@ public class MapsActivity extends FragmentActivity implements
 
                 if ( PermissionsAndLocmanOK )
                 {
-                    Intent intent = new Intent("com.example.quakemap.ProximityAlert");
+
+                    Intent intent = new Intent("com.example.locaman.ProximityAlert");
                     PendingIntent proxIntent = PendingIntent.getBroadcast(this, 0, intent, 0);
                     locman.addProximityAlert(Latitude, Longitude, 50000, -1, proxIntent);
-                    IntentFilter filter = new IntentFilter("com.example.quakemap.ProximityAlert");
-                    registerReceiver(new myProximityAlert(), filter);
+                    IntentFilter filter = new IntentFilter("com.example.locaman.ProximityAlert");
+                    myProximityAlert proximity = new myProximityAlert();
+
+                    /*Adds to array */
+                    if (malIntents        != null) malIntents.add(intent);
+                    if (malPendingIntents != null) malPendingIntents.add(proxIntent);
+                    if (malIntentFilters  != null) malIntentFilters.add(filter);
+                    if (malProximitys     != null) malProximitys.add(proximity);
+
+                    Intent registeredintent = registerReceiver(proximity, filter);
+
+                    malIntents.add(registeredintent);
                 }
 
                 Date datequaketime = new Date( Long.parseLong(quaketime) );
@@ -198,31 +269,8 @@ public class MapsActivity extends FragmentActivity implements
 
     public Marker getMarkerSelfFor()
     {
-
-        LatLng gpsPoint = mGnssListener.getLastPoint();
-        MarkerOptions mOptionsGPS = null;
-
-        if (mapMarkGPS != null)
-        {
-            mapMarkGPS = null;
-
-        }
-
-        if (mapMarkOptionsGPS != null)
-        {
-            mapMarkOptionsGPS = null;
-        }
-
-        mapMarkOptionsGPS = new MarkerOptions();
-        mapMarkOptionsGPS = mapMarkOptionsGPS;
-
-        mapMarkOptionsGPS.position(gpsPoint);
-        mapMarkOptionsGPS.title("Device GPS location");
-        mapMarkOptionsGPS.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE));
-
-        mapMarkGPS = mMap.addMarker(mapMarkOptionsGPS);
-
-        return mapMarkGPS;
+//        LatLng gpsPoint = mGnssListener.getLastPoint();
+        return null;
     }
 
     public void GPSLocation_changed() {
