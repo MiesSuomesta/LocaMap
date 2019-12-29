@@ -51,9 +51,14 @@ public class oJsonToObject {
                     Latitude,
                     PermissionsOK,
                     pLocman);
+
+            featurePropObj=null;
+            featureLocObj =null;
+
         } catch (JSONException e) {
             e.printStackTrace();
         }
+
 
         return ret;
     }
@@ -77,6 +82,12 @@ public class oJsonToObject {
             }
             retobj = new JSONObject(responseStrBuilder.toString());
 
+            // Clean up
+            dlurlconn = null;
+            dlurl = null;
+            iStream = null;
+            iStreamReader = null;
+            responseStrBuilder = null;
         } catch (JSONException e) {
             e.printStackTrace();
         } catch (Exception e) {

@@ -21,6 +21,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 
 
@@ -46,7 +48,7 @@ public class MapsActivity extends AppCompatActivity implements
         mGnssListener = new SatelliteListener();
 
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 1, mGnssListener);
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 15000, 1, mGnssListener);
 
         PermissionsAndLocmanOK =
                 ((checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
@@ -102,43 +104,54 @@ public class MapsActivity extends AppCompatActivity implements
         oJsonToObject jsonToJavaObj = new oJsonToObject();
         JSONObject quakejsonobj = jsonToJavaObj.jsonObjectFromUrl(jsonurl);
 
-
-        mMap.clear();
         mMap.setMyLocationEnabled(true);
         maJavaObjects.clear();
 
         try {
             featuresArr = quakejsonobj.getJSONArray("features");
+            int alen = featuresArr.length();
 
-            for (int i = 0; i < featuresArr.length(); i++) {
+            for (int i = 0; i < alen; i++) {
 
                 JSONObject featureObj = featuresArr.getJSONObject(i);
 
                 oJSONJavaObject jObj = jsonToJavaObj.jsonObjectToJavaObject(this, mMap,
-                                        featureObj,PermissionsAndLocmanOK,locationManager);
+                        featureObj,PermissionsAndLocmanOK,locationManager);
 
                 jObj.getMarkerForQuake();
 
                 maJavaObjects.add(jObj);
 
-/*
-                float[] distanceresults = { 0 };
-                if (lastGpsPoint != null) {
-                    double lastLat = lastGpsPoint.latitude;
-                    double lastLng = lastGpsPoint.longitude;
-                    distanceresults = new float[2];
-
-                    Location.distanceBetween(Latitude, Longitude, lastLat, lastLng, distanceresults);
-                }
-
-                Log.i("Distance: ", "" + distanceresults[0]);
-*/
-
             }
 
-            featuresArr = null;
 
         } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        featuresArr = null;
+        quakejsonobj = null;
+        jsonToJavaObj = null;
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.M)
+    public void refillGoogleMap(GoogleMap googleMap) {
+        DecimalFormat df = new DecimalFormat("#.##");
+        df.setRoundingMode(RoundingMode.CEILING);
+
+
+        mMap.setMyLocationEnabled(true);
+
+        try {
+            for (oJSONJavaObject tmp : maJavaObjects)
+            {
+                double dist = tmp.getMarkerDistanceToDevice(lastGpsPoint);
+
+                tmp.setmSnippetExtra("\n" + df.format(dist) + " km away");
+
+                tmp.getMarkerForQuake();
+            }
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
@@ -155,7 +168,7 @@ public class MapsActivity extends AppCompatActivity implements
         lastGpsPoint = null;
         lastGpsPoint = mGnssListener.getLastPoint();
 
-        fillGoogleMap(mMap);
+        this.refillGoogleMap(mMap);
     }
 
     public void GPSLocation_changed() {
